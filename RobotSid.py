@@ -3,6 +3,7 @@ import re
 from RobotBase import RobotParseBase
 import httplib2
 import random
+import sqlite3
 
 #对每个Subject进行信息提取的机器人
 class RobotSid(RobotParseBase):

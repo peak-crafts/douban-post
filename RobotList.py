@@ -2,7 +2,7 @@
 import re
 from RobotBase import RobotParseBase
 import httplib2
-import pickle
+import sqlite3
 
 class RobotList(RobotParseBase):
     def __init__(self, db_type=0):
@@ -51,30 +51,64 @@ class RobotList(RobotParseBase):
 
     def save_ids(self):
         '''
-        保存更新的ids到文件, 失败返回[]
+        save the lists in database
         '''
         tag=self.untag.decode('utf-8')
-        try:
-            ids_f=open(self.get_idpath()+tag, 'wb')
-        except IOError, e:
-            #print e
+        if not self.init_db():
             return False
-        pickle.dump(self.result, ids_f)
-        ids_f.close()
+        cur=self.conn.cursor()
+        op="""SELECT tid 
+            From tags 
+            WHERE content=='%s' AND type==%d"""%(tag, self.dbt)
+        cur.execute(op)
+        ret=cur.fetchone()
+        if not ret:
+            return False
+        tid=ret[0]
+        op="""SELECT sid
+            FROM lists
+            WHERE tid=%d
+        """%tid
+        cur.execute(op)
+        rets=[ret[0] for ret in cur]
+        for sid, tittle in self.result:
+            if sid in rets:
+                continue
+            op="""INSERT INTO lists (sid, tid, done, tittle)
+                VALUES (?, ?, ?, ?)
+            """
+            vals=(sid, tid, 0, self.utf82uni(tittle))
+            cur.execute(op, vals)
+        if not self.finish_db():
+            return False
         return True
 
     def read_ids(self):
         '''
-        读取ids文件
+        load the lists in database
         '''
-        filename=self.untag.decode('utf-8')
-        try:
-            ids_f=open(self.get_idpath()+filename, 'rb')
-        except IOError, e:
-            #print e
+        tag=self.untag.decode('utf-8')
+        if not self.init_db():
             return False
-        self.result=pickle.load(ids_f)
-        ids_f.close()
+        cur=self.conn.cursor()
+        op="""SELECT tid
+            FROM tags
+            WHERE content=='%s' AND type==%d
+        """%(tag, self.dbt)
+        cur.execute(op)
+        ret=cur.fetchone()
+        if not ret:
+            return False
+        tid=ret[0]
+        op="""SELECT sid, tittle
+            FROM lists
+            WHERE tid=%d
+        """%tid
+        cur.execute(op)
+        rets=[(ret[0], self.uni2utf8(ret[1])) for ret in cur]
+        if not rets:
+            return False
+        self.result=rets
         return True
 
     def netstart(self, tag):
@@ -108,4 +142,4 @@ class RobotList(RobotParseBase):
     
 if __name__=='__main__':
     r=RobotList()
-    print r.localstart('1989')
+    r.netstart("1989")

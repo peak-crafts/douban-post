@@ -8,12 +8,8 @@ import os
 import random
 
 class RobotProfile(RobotBase):
-    def __init__(self, db_type=0, profile_name=r'profile.dat'):
+    def __init__(self, db_type=0):
         RobotBase.__init__(self, db_type)
-        self.profile_name=profile_name
-        self.profile=[[],
-                      [],
-                      []]
         self.msg=str()
 
     def read_profile(self):
@@ -39,18 +35,13 @@ class RobotProfile(RobotBase):
     def initial_tag(self, local_first=True):
         for i in [0, 1, 2]:
             r_tag=RobotTag(i)
-            temp=list()
             if local_first:
                 if not r_tag.localstart():
                     return False
             else:
                 if not r_tag.netstart():
                     return False
-            tag_res=r_tag.result
-            for j in range(len(tag_res)):
-                temp.append((0, 0))
-            self.profile[i].extend(temp)
-        return self.save_profile()
+        return True
 
     def read_todo(self, tid=0, local_first=True):
         r_tag=RobotTag(self.dbt)
@@ -105,7 +96,7 @@ class RobotProfile(RobotBase):
         
     def start(self, tid=0, ndone=10, interest=4):
         if not self.read_profile():
-            print transcode('重新开始记录')
+            print transcode('重dd新开始记录')
             self.initial_tag()
         if not self.read_todo(tid):
                 return False

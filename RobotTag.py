@@ -1,8 +1,9 @@
+# !/usr/bin/python
 # -*- coding: utf-8 -*-
 import re
 from RobotBase import RobotParseBase
 import httplib2
-import pickle
+import sqlite3
 
 class RobotTag(RobotParseBase):
     def __init__(self, db_type=0):
@@ -11,29 +12,40 @@ class RobotTag(RobotParseBase):
 
     def save_tag(self):
         '''
-        保存更新的tag到文件__procees_file, 失败返回[]
+        update the tag in database
         '''        
-        try:
-            tag_f=open(self.db_type+'.dat', 'wb')
-        except IOError, e:
-            #print e
+        if not self.init_db():
             return False
-        pickle.dump(self.result, tag_f)
-        tag_f.close()
+        cur=self.conn.cursor()
+        op="SELECT content FROM tags WHERE type==%d"%self.dbt
+        cur.execute(op)
+        rets=[ret[0] for ret in cur]
+        for tag in self.result:
+            tag=self.utf82uni(tag)
+            if tag in rets:
+                continue
+            op='''INSERT INTO tags (content, type)
+                VALUES (?, ?)
+            '''
+            vals=(tag, self.dbt)
+            cur.execute(op, vals)
+        if not self.finish_db():
+            return False
         return True
 
     def read_tag(self):
         '''
-        读取tag文件
+        load the tags in database
         '''
-        try:
-            tag_f=open(self.db_type+'.dat', 'rb')
-        except IOError, e:
-            #print e
+        if not self.init_db():
             return False
-        ret_tag=pickle.load(tag_f)
-        tag_f.close()
-        self.result=ret_tag
+        cur=self.conn.cursor()
+        op="SELECT content FROM tags WHERE type==%d"%self.dbt
+        cur.execute(op)
+        rets=[ret[0] for ret in cur]
+        if len(ret)==0:
+            return False
+        self.result=[self.uni2utf8(ret) for ret in rets]
         return True
 
     def get_tag(self):
@@ -70,7 +82,7 @@ class RobotTag(RobotParseBase):
         else:
             return True
 
-    def netstart(self, save=False):
+    def netstart(self, save=True):
         if not self.get_tag():
             return False
         if not self.parse_tag():
@@ -81,4 +93,4 @@ class RobotTag(RobotParseBase):
 
 if __name__=='__main__':
     r=RobotTag(0)
-    print r.localstart()
+    print r.netstart(True)
