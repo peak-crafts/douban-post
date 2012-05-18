@@ -20,7 +20,7 @@ class RobotTag(RobotParseBase):
         op="SELECT content FROM tags WHERE type==%d"%self.dbt
         cur.execute(op)
         rets=[ret[0] for ret in cur]
-        for tag in self.result:
+        for tag in self.tag:
             tag=self.utf82uni(tag)
             if tag in rets:
                 continue
@@ -40,17 +40,18 @@ class RobotTag(RobotParseBase):
         if not self.init_db():
             return False
         cur=self.conn.cursor()
-        op="SELECT content FROM tags WHERE type==%d"%self.dbt
+        op="SELECT content, tid FROM tags WHERE type==%d"%self.dbt
         cur.execute(op)
-        rets=[ret[0] for ret in cur]
-        if len(ret)==0:
+        rets=[(ret[0], ret[1]) for ret in cur]
+        if len(rets)==0:
             return False
-        self.result=[self.uni2utf8(ret) for ret in rets]
+        self.result=[(self.uni2utf8(ret[0]), ret[1]) for ret in rets]
+        self.finish_db()
         return True
 
     def get_tag(self):
         '''
-        获得所有标签，没有返回Boolean
+        get the html of tags
         '''
         tag_url=self.get_domain()+'tag/'
         h=httplib2.Http()
@@ -71,26 +72,27 @@ class RobotTag(RobotParseBase):
         tag_pattern=re.compile(tag_re, re.S)
         tag_res=tag_pattern.findall(self.get_html())
         self.msg=len(tag_res)
-        self.result=tag_res
-        if not self.result:
+        self.tag=tag_res
+        if not self.tag:
             return False
         return True
 
-    def localstart(self):
+    def load_tags(self):
         if not self.read_tag():
-            return self.netstart(True)
-        else:
-            return True
+            if not self.downloads():
+                return False
+            if not self.read_tag():
+                return False
+        return True
 
-    def netstart(self, save=True):
+    def downloads(self):
         if not self.get_tag():
             return False
         if not self.parse_tag():
             return False
-        if save:
-            return self.save_tag()
-        return True
+        return self.save_tag()
 
 if __name__=='__main__':
-    r=RobotTag(0)
-    print r.netstart(True)
+    r=RobotTag(2)
+    print r.load_tags()
+    print r.result

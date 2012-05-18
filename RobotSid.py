@@ -9,18 +9,11 @@ import sqlite3
 class RobotSid(RobotParseBase):
     def __init__(self, db_type=0, cookie_path=r"cookie.txt"):
         RobotParseBase.__init__(self, db_type)
-        self.__html=str()
-        self.__sid=0
+        self.sid=0
         #self.result=list()
         self.count=0
         self.cookie_path=cookie_path
     
-    def set_sid(self, sid):
-        self.__sid=sid
-
-    def get_sid(self):
-        return self.__sid
-
     def get_cpath(self):
         return self.cookie_path
 
@@ -61,7 +54,7 @@ class RobotSid(RobotParseBase):
         '''
         获得一页的info，返回Boolean
         '''
-        comment_url=self.get_domain()+'subject/%d/'%self.get_sid()
+        comment_url=self.get_domain()+'subject/%d/'%self.sid
         h=httplib2.Http()
         headers=self.get_headers()
         try:
@@ -111,7 +104,7 @@ class RobotSid(RobotParseBase):
 
     def post(self):
         info=self.result
-        post_url=self.get_domain()+'j/subject/%d/interest'%self.get_sid()
+        post_url=self.get_domain()+'j/subject/%d/interest'%self.sid
         post_body='ck=%(ck)s&interest=%(interest)s&rating=%(rate)d\
 &foldcollect=F&tags=%(tag)s&comment=%(comment)s'
         ret=self.get_cookie()
@@ -147,6 +140,52 @@ class RobotSid(RobotParseBase):
             print e
             return False
         return True
+    
+    def update_done(self):
+        if not self.init_db():
+            return False
+        cur=self.conn.cursor()
+        op='''UPDATE lists 
+            SET done=1
+            WHERE sid=%d
+        '''%self.sid
+        cur.execute(op)
+        if not self.finish_db():
+            return False
+        return True
+
+    def update_subject(self):
+        if not self.init_db():
+            return False
+        cur=self.conn.cursor()
+        op='''SELECT COUNT(*)
+            FROM subjects
+            WHERE sid=%d
+        '''%self.sid
+        cur.execute(op)
+        ret=cur.fetchone()
+        if ret[0]==0:
+            op="""INSERT INTO subjects (
+                sid, rate, tags, comment)
+                VALUES(?, ?, ?, ?)
+            """
+            vals=(self.sid, 
+                    self.result[0],
+                    self.utf82uni(' '.join(self.result[1])),
+                    self.utf82uni(self.result[2]))
+            cur.execute(op, vals)
+        else:
+            op="""UPDATE subjects
+                SET rate=?, tags=?, comment=?
+                WHERE sid=%d
+            """%self.sid
+            vals=(self.result[0],
+                    self.utf82uni(' '.join(self.result[1])),
+                    self.utf82uni(self.result[2]))
+            cur.execute(op, vals)
+        if not self.finish_db():
+            return False
+        return True
 
     def start(self, sid, interest=4):
         '''
@@ -154,14 +193,18 @@ class RobotSid(RobotParseBase):
         '''
         self.set_interest(interest)
         self.count+=1
-        self.set_sid(sid)
+        self.sid=sid
         if not self.get_info():
             return False
         self.parse_info()
         if not self.post():
             return False
+        if not self.update_subject():
+            return False
+        if not self.update_done():
+            return False
         return True
 
 if __name__=='__main__':
     r=RobotSid()
-    print r.start(4166819)
+    print r.start(1997575)
